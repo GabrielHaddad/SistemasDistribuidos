@@ -1,13 +1,16 @@
-# SistemasDistribuidos
+# SistemasDistribuidos:
+
 Projeto de Sistemas Distribuidos para matéria de SD
 
-#Descrição do Projeto
+#Descrição do Projeto:
+
 Projeto inicialmente se baseia em um aplicativo de chat ao estilo do Whatsapp,
 onde poderão ter conversas privadas entre duas pessoas ou criação de grupos
 com mais pessoas.
 Terá alguns clientes que irão se conectar ao servidor e começaram a conversa.
 
-#Testes a serem implementados
+#Testes a serem implementados:
+
 Para um projeto de chat com várias pessoas é indispensável um teste de concorrência
 na qual criando um grupo com várias pessoas ao mesmo tempo, o serviço ocorra normal
 mente.
