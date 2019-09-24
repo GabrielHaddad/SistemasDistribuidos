@@ -1,9 +1,15 @@
 #!/usr/bin/python3
 
 import pygame
+import socket
+import random
 from pygame.locals import *
 from random import randrange
 
+
+port = 16161
+s_ip = '192.168.0.12'
+port_to_play = 16661
 
 vel_dificul         = 1
 explodir_nave	    = False 
@@ -137,8 +143,33 @@ nave = {
 	}
 }
 
+#----------------------------------------------------------------------------------------------------------------------------------------------
+
+host = socket.gethostname()
+myip = socket.gethostbyname(host)
+s    = socket.socket()
+
+sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+sock.bind((host,port_to_play))
+
+#----------------------------------------------------------------------------------------------------------------------------------------------
+
+s.connect((s_ip, port))
+s.send(myip.encode())
+s.close()
+
+#----------------------------------------------------------------------------------------------------------------------------------------------
+
+data, addr = sock.recvfrom(4096)
+
+print(int(data.decode()))
+
+sock.close()
+
+#----------------------------------------------------------------------------------------------------------------------------------------------
 
 while True:
+	break
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
@@ -164,6 +195,7 @@ while True:
 	pygame.display.update()
 
 while True :
+	break
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
