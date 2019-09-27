@@ -1,210 +1,278 @@
+#!/usr/bin/python3
+
+import queue
 import pygame
+import socket
+import random
+import threading
 from pygame.locals import *
 from random import randrange
+
+g_list = []
+
+host = socket.gethostname()
+myip = socket.gethostbyname(host)
+
+port = 16161          # porta para conectar ao servidor/ seu valor vai provavelmente mudar durante a execução do programa
+#s_ip = '192.168.0.12' # ip do servidor
+port_to_play = 12345
+
+synchronized_queue  = queue.Queue(100)
+colidiu_2           = False
+colidiu_1           = False
+vel_dificul         = 1
+explodir_nave	    = False 
+collided	    = False
+pontos		    = 0 #VARIAVEL PONTUACAO
+pontuacaototal	    = 0 #VARIAVEL DE CONTROLE DE NIVEIS
+tick_musica	    = 0 #VARIAVEL CONTROLADORA DE MUSICA
+spawn_de_asteroides = 800 #SPAWN DE ASTEROIDES DE ACORDO COM PONTUAÇÃO TOTAL
+asteroides	    = [] #LISTA DE ASTEROIDES
+background_filename = 'galaxy2.png' 
+
+
+def create_asteroide(vel_dificul):
+	return {
+		'tela': pygame.image.load('asteroide1.png').convert_alpha(),
+		'posicao': [randrange(1200), -64],#POSIÇÃO DE ONDE COMEÇA O ASTEROIDE
+		'velocidade': randrange(vel_dificul,vel_dificul + 1)
+	}
+
+def nave_collided():
+	nave_rect = get_rect(nave)
+	for asteroide in asteroides:
+		if nave_rect.colliderect(get_rect(asteroide)):
+			return True
+
+	return False
+
+def mover_asteroides():
+	for asteroide in asteroides:
+		asteroide['posicao'][1] += asteroide['velocidade']
+
+def get_rect(obj): 
+	return Rect(obj['posicao'][0],obj['posicao'][1],obj['tela'].get_width(),obj['tela'].get_height())
+
+def render_scene():
+	global screen
+	global score_font
+	global asteroides
+	global pontuacaototal
+	global dificuldade_font
+
+	screen.blit(background, (0, 0)) 
+	textopontos = score_font.render('PONTUAÇÃO:'+str(pontos)+' ',1 ,(250,250,250))
+
+	for asteroide in asteroides: #BLIT DOS ASTEROIDES NA TELA
+		screen.blit(asteroide['tela'], asteroide['posicao'])
+
+	if collided == False:
+		screen.blit(textopontos, (0,0)) #TXT DO SCORE
+	else:
+		screen.blit(textopontos, (450, 300)) #TXT DO SCORE QUANDO ACABA O JOGO
+
+
+	if (pontuacaototal<=9999): #CORES DOS LETREIROS DE DIFICULDADE
+		dif1 = dificuldade_font.render('Dificuldade: Iniciante', 1, (255, 255, 255))
+		screen.blit(dif1, (0, 22))
+	elif (pontuacaototal<=20000):
+		dif1 = dificuldade_font.render('Dificuldade: Amador', 1, (30,144,255))
+		screen.blit(dif1, (0, 22))
+	elif (pontuacaototal<=30000):
+		dif1 = dificuldade_font.render('Dificuldade: Intermediário ', 1, (255,255,0))
+		screen.blit(dif1, (0, 22))
+	elif (pontuacaototal<=40000):
+		dif1 = dificuldade_font.render('Dificuldade: Profissional', 1, (255,0,255))
+		screen.blit(dif1, (0, 22))
+	elif (pontuacaototal<=60000):
+		dif1 = dificuldade_font.render('Dificuldade: Star Wars', 1, (255,0,0))
+		screen.blit(dif1, (0, 22))
+
+	nave['posicao'][0]  += nave['velocidade']['x'] 
+
+	screen.blit(nave['tela'], nave['posicao'])
+
+def raise_difficulty():
+	global vel_dificul
+	global pontuacaototal
+
+	if(pontuacaototal >= 1000):
+		vel_dificul = 1
+	if (pontuacaototal >= 10000):
+		vel_dificul = 2
+	if (pontuacaototal >= 20000):
+		vel_dificul = 3
+	if (pontuacaototal >= 30000):
+		vel_dificul = 4
+	if (pontuacaototal >= 40000):
+		vel_dificul = 5
+	if (pontuacaototal >= 60000):
+		vel_dificul = 6
+
+def block_ship():
+	global nave
+
+	#POSIÇÃO PARA BARRAR A NAVE
+	if(nave['posicao'][0] > 1150):
+		nave['posicao'][0] = 1150
+	if(nave['posicao'][0] < 0):
+		nave['posicao'][0] = 0
+
+def mov_ship():
+	global nave
+
+	if pygame.key.get_pressed()[K_a] : 
+#		nave['posicao'][0] += -1.5
+		nave['posicao'][0] += -1
+		send_message() # Ira enviar pacote para o servidor
+	elif pygame.key.get_pressed()[K_d] :
+#		nave['posicao'][0] +=  1.5
+		nave['posicao'][0] +=  1
+		send_message() # Ira enviar pacote para o servidor
+
+	block_ship()
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# thread que recebe mensagens do servidor e coloca elas em uma fila bloqueantes
+#  Uso de protocolo UDP
+#  Seems like it'working
+#  Obs .: Há a possibilidade da primeira mensagem não estar sendo recebida
+def receive_messages():
+	global host
+	global g_list
+	global port_to_play
+
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Socket para receber dados do jogo
+	sock.bind((host,port_to_play))
+
+	while True:
+		data, addr = sock.recvfrom(4096)
+		d_list = data.decode().split(";")
+
+	# Mudar para inserir em uma fila bloqueante
+
+		synchronized_queue.put({
+			'asteroide' : int(d_list[0]),
+			'nave1'     : int(d_list[1]),
+			'nave2'     : int(d_list[2]),
+			'colidiu_p1': d_list[3],
+			'colidiu_p2': d_list[4],
+		})
+
+		print("I received : ",int(d_list[0]))
+
+	sock.close()
+
+# thread de envio de mensagens
+#   Acrescentar campo colidiu na mensagem e o modo do servidor lidar com isso
+#   Função deve ser invocada quando o player usa uma tecla para mover
+#   Função deve ser chamada a cada milesimo de segundo
+def send_message():
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+	data = str(nave['posicao'][0])
+	print("I sent : ",data)
+	sent = sock.sendto(data.encode(),(host,port))
+
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 pygame.init() 
 pygame.font.init()
 
-#VARIAVEIS SONOROS
-explosion_sound = pygame.mixer.Sound('boom.wav')
-musica_fundo = pygame.mixer.Sound('boom.wav')
-explodir_nave = False #CONTROLE SOM GAME OVER
+explosion_sound  = pygame.mixer.Sound('boom.wav')
+musica_fundo	 = pygame.mixer.Sound('boom.wav')
+
 pygame.display.set_caption('Space Invaders') 
 
-#VARIAVEIS GERAIS
-collided = False
-pontos = 0 #VARIAVEL PONTUACAO
-pontuacaototal = 0 #VARIAVEL DE CONTROLE DE NIVEIS
-tick_musica = 0 #VARIAVEL CONTROLADORA DE MUSICA
-spawn_de_asteroides = 800 #SPAWN DE ASTEROIDES DE ACORDO COM PONTUAÇÃO TOTAL
-asteroides = [] #LISTA DE ASTEROIDES
-font_name = pygame.font.get_default_font()
-
-#tamanho da fonte(GAME OVER,SCORE,LEVEL)
-game_font = pygame.font.SysFont(font_name, 72) 
-score_font = pygame.font.SysFont(font_name, 35) 
-level_font = pygame.font.SysFont(font_name, 40)
+font_name	 = pygame.font.get_default_font()
+game_font	 = pygame.font.SysFont(font_name, 72) 
+score_font	 = pygame.font.SysFont(font_name, 35) 
+level_font	 = pygame.font.SysFont(font_name, 40)
 dificuldade_font = pygame.font.SysFont(font_name, 30)
+screen           = pygame.display.set_mode((1200, 700)) 
+background       = pygame.image.load(background_filename).convert()
 
-#Tamanho da tela
-screen = pygame.display.set_mode((1200, 700)) 
-
-#imagem de fundo
-background_filename = 'galaxy2.png' 
-background = pygame.image.load(background_filename).convert()
-
-
-
-#CRIAR ASTEROIDE
-def create_asteroide():
-    return {
-        'tela': pygame.image.load('asteroide1.png').convert_alpha(),
-        'posicao': [randrange(1200), -64],#POSIÇÃO DE ONDE COMEÇA O ASTEROIDE
-        'velocidade': randrange(1)
-    }
-
-#Nave(imagem da nave, posição e velocidade)
-nave = {
-    'tela': pygame.image.load('nave.png').convert_alpha(),
-    'posicao': [1200/2, 700 - 60], 
-    'velocidade': {
-        'x': 0,
-    }
+nave  = {
+	'tela': pygame.image.load('nave.png').convert_alpha(),
+	'posicao': [1200/2, 700 - 60], 
+	'velocidade': {
+		'x': 0,
+	}
 }
 
-#Segunda Nave(imagem da nave, posição e velocidade)
-nave2 = {
-    'tela': pygame.image.load('nave2.png').convert_alpha(),
-    'posicao': [1200/2, 700 - 60], 
-    'velocidade': {
-        'x': 0,
-    }
+nave2 =  {
+	'tela': pygame.image.load('nave.png').convert_alpha(),
+	'posicao': [1200/2, 700 - 60], 
+	'velocidade': {
+		'x': 0,
+	}
 }
 
+#----------------------------------------------------------------------------------------------------------------------------------------------
+# Estabelece conexão : Envia ip e porta de comunicação para o servidor
 
-# PEGA POSIÇÃO DA NAVE 'RECT' E 'RECT' DO ASTEROIDE
-def nave_collided():
-    nave_rect = get_rect(nave)
-    nave_rect2 = get_rect(nave2)
-    for asteroide in asteroides:
-        if nave_rect.colliderect(get_rect(asteroide)) or nave_rect2.colliderect(get_rect(asteroide)):
-            return True
+s = socket.socket() # Socket para estabelecer conexão com servidor
 
-    return False
+s.connect((host, port))
+s.send(myip.encode())
+data = s.recv(1024)
+port = int(data.decode())
+s.close()
 
-#MOVIMENTO DOS ASTEROIDES
-def mover_asteroides():
-    for asteroide in asteroides:
-        asteroide['posicao'][1] += asteroide['velocidade']
+#----------------------------------------------------------------------------------------------------------------------------------------------
 
-#OBTER POSIÇÃO DOS OBJETOS
-def get_rect(obj): 
-    return Rect(obj['posicao'][0],
-                obj['posicao'][1],
-                obj['tela'].get_width(),
-                obj['tela'].get_height())
+while True:
+	try:
+		r_mesg = threading.Thread(target=receive_messages)
+		r_mesg.start()
+		break
+	except:
+		print("Error")
+		pass
 
+#----------------------------------------------------------------------------------------------------------------------------------------------
 
+while True:
+	for event in pygame.event.get():
+		if event.type == QUIT:
+			exit()
 
+#	if not spawn_de_asteroides:
+#		spawn_de_asteroides = 220
+#		asteroides.append(create_asteroide(vel_dificul))
+#	else:
+#		spawn_de_asteroides -= 1
 
-while True: #CONTROLE DE asteroideS SPAWNADOS POR PONTUAÇÃO
-    if not spawn_de_asteroides:
-        spawn_de_asteroides = 220
-        asteroides.append(create_asteroide())
+	render_scene()
+	raise_difficulty()
+	mover_asteroides()
+	mov_ship()
 
-    else:
-        spawn_de_asteroides -= 1
+	collided = nave_collided() 
+	if collided :
+		break
+			
+	pontuacaototal += 1 #PONTUAÇÃO SENDO ADICIONADA DENTRO DE UMA VARIAVEL, ANINHADA COM WHILE
+	pontos         += 1
 
-    nave['velocidade'] = {
-        'x': 0,
-    }
+	pygame.display.update()
 
-    nave2['velocidade'] = {
-        'x': 0,
-    }
+while True :
+	for event in pygame.event.get():
+		if event.type == QUIT:
+			exit()
+	render_scene()
 
+	if not explodir_nave: #CONDIÇÃO DO SISTEMA SONORO CASO A NAVE EXPLODA
+		musica_fundo.stop()
+		explodir_nave = True 
+		explosion_sound.play() 
+		nave['posicao'][0] += nave['velocidade']['x']
+		
+		
+		screen.blit(nave['tela'], nave['posicao'])
+	else:
+		text = game_font.render('VOCE PERDEU!!', 1, (255, 0, 0)) 			
+		screen.blit(text, (450, 350)) #TXT DO GAME OVER APOS O JOGO
 
-    for event in pygame.event.get():
-        if event.type == QUIT:
-            exit()
-            
-    pontuacaototal += 1 #PONTUAÇÃO SENDO ADICIONADA DENTRO DE UMA VARIAVEL, ANINHADA COM WHILE
-    
-    #VELOCIDADE DE SE MEXER COM AS SETAS
-    if pygame.key.get_pressed()[K_a] : 
-     nave['velocidade']['x'] = -1
-    elif pygame.key.get_pressed()[K_d] :
-     nave['velocidade']['x'] = 1
-
-     #VELOCIDADE DE SE MEXER COM AS SETAS
-    if pygame.key.get_pressed()[K_LEFT] : 
-     nave2['velocidade']['x'] = -1
-    elif pygame.key.get_pressed()[K_RIGHT] :
-     nave2['velocidade']['x'] = 1
-     
-    #DE ONDE COMEÇA O BACKGROUND
-    screen.blit(background, (0, 0)) 
-    
-    #PONTUAÇÃO LETREIRO
-    textopontos = score_font.render('PONTUAÇÃO:'+str(pontos)+' ',1 ,(250,250,250))
-    #VELOCIDADE DOS asteroideS DE ACORDO COM A PONTUAÇÃO
-    if(pontuacaototal >= 1000):
-        asteroide['velocidade'] = 1
-    if (pontuacaototal >= 10000):
-        asteroide['velocidade'] = 1.5
-    if (pontuacaototal >= 20000):
-        asteroide['velocidade'] = 2
-    if (pontuacaototal >= 30000):
-        asteroide['velocidade'] = 2.5
-    if (pontuacaototal >= 40000):
-        asteroide['velocidade'] = 3
-    if (pontuacaototal >= 60000):
-        asteroide['velocidade'] = 3.5
-        
-        
-    if collided == False:
-        screen.blit(textopontos, (0,0)) #TXT DO SCORE
-    else:
-       screen.blit(textopontos, (450, 300)) #TXT DO SCORE QUANDO ACABA O JOGO
-    mover_asteroides()
-
-    for asteroide in asteroides: #BLIT DOS ASTEROIDES NA TELA
-        screen.blit(asteroide['tela'], asteroide['posicao'])
-
-    if (pontuacaototal<=9999): #CORES DOS LETREIROS DE DIFICULDADE
-        dif1 = dificuldade_font.render('Dificuldade: Iniciante', 1, (255, 255, 255))
-        screen.blit(dif1, (0, 22))
-    elif (pontuacaototal<=20000):
-        dif1 = dificuldade_font.render('Dificuldade: Amador', 1, (30,144,255))
-        screen.blit(dif1, (0, 22))
-    elif (pontuacaototal<=30000):
-        dif1 = dificuldade_font.render('Dificuldade: Intermediário ', 1, (255,255,0))
-        screen.blit(dif1, (0, 22))
-    elif (pontuacaototal<=40000):
-        dif1 = dificuldade_font.render('Dificuldade: Profissional', 1, (255,0,255))
-        screen.blit(dif1, (0, 22))
-    elif (pontuacaototal<=60000):
-        dif1 = dificuldade_font.render('Dificuldade: Star Wars', 1, (255,0,0))
-        screen.blit(dif1, (0, 22))
-        
-    if not collided: #CONDIÇÃO PARA CASO A NAVE COLIDIR COM ASTEROIDE
-        if (tick_musica == 0):
-            musica_fundo.play()
-            tick_musica += 1
-        else:
-            tick_musica += 1
-        collided = nave_collided() 
-        nave['posicao'][0] += nave['velocidade']['x'] 
-        nave2['posicao'][0] += nave2['velocidade']['x'] 
-        pontos += 1
-        screen.blit(nave['tela'], nave['posicao'])
-        screen.blit(nave2['tela'], nave2['posicao'])
-        
-    else:
-        if not explodir_nave: #CONDIÇÃO DO SISTEMA SONORO CASO A NAVE EXPLODA
-            musica_fundo.stop()
-            explodir_nave = True 
-            explosion_sound.play() 
-            nave['posicao'][0] += nave['velocidade']['x']
-            nave2['posicao'][0] += nave2['velocidade']['x']  
-            
-            
-            screen.blit(nave['tela'], nave['posicao'])
-            screen.blit(nave2['tela'], nave2['posicao'])
-        else:
-            text = game_font.render('VOCE PERDEU!!', 1, (255, 0, 0)) 
-            
-            screen.blit(text, (450, 350)) #TXT DO GAME OVER APOS O JOGO
-            
-    #POSIÇÃO PARA BARRAR A NAVE
-    if(nave['posicao'][0] > 1150):
-        nave['posicao'][0] = 1150
-    if(nave['posicao'][0] < 0):
-        nave['posicao'][0] = 0
-
-    if(nave2['posicao'][0] > 1150):
-        nave2['posicao'][0] = 1150
-    if(nave2['posicao'][0] < 0):
-        nave2['posicao'][0] = 0
-
-    pygame.display.update()
+	pygame.display.update()
