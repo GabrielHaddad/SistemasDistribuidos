@@ -3,6 +3,7 @@
 import threading
 import socket
 import random
+import queue
 import time
 import os
 
@@ -12,8 +13,9 @@ port         = 16161
 host         = socket.gethostname()
 clients      = ["172.16.0.5"] 
 mesg_port    = 12346
-port_to_play = 12345
+port_to_play = 16661
 state        = {'asteroide' : 1,'nave1': 600,'nave2': 600,'p1' : 'F','p2' : 'F'}
+meg_queue    = queue.Queue()
 
 def play_game():
 	global clients
@@ -33,11 +35,12 @@ def send_message_client():
 	print(cli1," x ",cli2," (",port_to_play,")")
 
 	while True:
-		state['asteroide'] = random.randint(1,666)
+		state['asteroide'] = random.randint(1,1200)
 		data = str(state['asteroide']) + ";" + str(state['nave1']) + ";" + str(state['nave2']) + ";" + str(state['p1']) + ";" + str(state['p2'])
 		print("I've sent : ",data," To : ",(cli1,port_to_play))
 		sent = sock.sendto(data.encode(),(cli1,port_to_play))
-		time.sleep(.3)
+#		sent = sock.sendto(data.encode(),(cli2,port_to_play))
+		time.sleep(.5)
 
 	sock.close()
 
@@ -48,12 +51,12 @@ def receive_client_messages():
 	global mesg_port
 
 	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Socket para receber dados do jogo
-	
+	print("Bind in ",(host,mesg_port))
 	sock.bind((host,mesg_port))
 
 	while True:
 		data, addr = sock.recvfrom(4096)
-		print("I've received : ",data.decode())
+		print("I've received : ",data.decode()," ",addr)
 
 
 def recieve_clients():
@@ -65,6 +68,7 @@ def recieve_clients():
 	sessao = False
 
 	s = socket.socket()
+	print("Bind in ",(host,port))
 	s.bind((host, port))
 	s.listen(5)
 

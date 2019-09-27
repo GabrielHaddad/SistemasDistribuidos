@@ -48,7 +48,7 @@ def nave_collided():
 
 def mover_asteroides():
 	for asteroide in asteroides:
-		asteroide['posicao'][1] += asteroide['velocidade']
+		asteroide['posicao'][1] += 1
 
 def get_rect(obj): 
 	return Rect(obj['posicao'][0],obj['posicao'][1],obj['tela'].get_width(),obj['tela'].get_height())
@@ -123,11 +123,11 @@ def mov_ship():
 
 	if pygame.key.get_pressed()[K_a] : 
 #		nave['posicao'][0] += -1.5
-		nave['posicao'][0] += -1
+		nave['posicao'][0] += -2
 		send_message() # Ira enviar pacote para o servidor
 	elif pygame.key.get_pressed()[K_d] :
 #		nave['posicao'][0] +=  1.5
-		nave['posicao'][0] +=  1
+		nave['posicao'][0] +=  2
 		send_message() # Ira enviar pacote para o servidor
 
 	block_ship()
