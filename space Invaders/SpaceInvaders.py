@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import queue
 import pygame
 import socket
 import random
@@ -16,6 +17,7 @@ port = 16161          # porta para conectar ao servidor/ seu valor vai provavelm
 #s_ip = '192.168.0.12' # ip do servidor
 port_to_play = 12345
 
+synchronized_queue  = queue.Queue(100)
 colidiu_2           = False
 colidiu_1           = False
 vel_dificul         = 1
@@ -148,16 +150,16 @@ def receive_messages():
 		d_list = data.decode().split(";")
 
 	# Mudar para inserir em uma fila bloqueante
-		asteroide_pos = int(d_list[0])
-		nave1_pos     = int(d_list[1])
-		nave2_pos     = int(d_list[2])
-		p1_win        = d_list[3]
-		p2_win        = d_list[4]
 
-		if p1_win == 'T' or p2_win == 'T' :
-			break
+		synchronized_queue.put({
+			'asteroide' : int(d_list[0]),
+			'nave1'     : int(d_list[1]),
+			'nave2'     : int(d_list[2]),
+			'colidiu_p1': d_list[3],
+			'colidiu_p2': d_list[4],
+		})
 
-		print("I received : ",asteroide_pos)
+		print("I received : ",int(d_list[0]))
 
 	sock.close()
 
