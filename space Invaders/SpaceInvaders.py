@@ -3,13 +3,18 @@
 import pygame
 import socket
 import random
+import threading
 from pygame.locals import *
 from random import randrange
 
+g_list = []
 
-port = 16161
-s_ip = '192.168.0.12'
-port_to_play = 16661
+host = socket.gethostname()
+myip = socket.gethostbyname(host)
+
+port = 16161          # porta para conectar ao servidor/ seu valor vai provavelmente mudar durante a execução do programa
+s_ip = '192.168.0.12' # ip do servidor
+port_to_play = 12345
 
 vel_dificul         = 1
 explodir_nave	    = False 
@@ -110,12 +115,52 @@ def block_ship():
 		nave['posicao'][0] = 0
 
 def mov_ship():
-	if pygame.key.get_pressed()[K_a] : 
-		nave['posicao'][0] += -1.5
-	elif pygame.key.get_pressed()[K_d] :
-		nave['posicao'][0] +=  1.5
+	global nave
 
+	if pygame.key.get_pressed()[K_a] : 
+#		nave['posicao'][0] += -1.5
+		nave['posicao'][0] += -1
+	elif pygame.key.get_pressed()[K_d] :
+#		nave['posicao'][0] +=  1.5
+		nave['posicao'][0] +=  1
+
+	send_message() # Ira enviar pacote para o servidor
 	block_ship()
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# thread que recebe mensagens do servidor e coloca elas em uma fila bloqueantes
+#  Uso de protocolo UDP
+def receive_messages():
+	global host
+	global g_list
+	global port_to_play
+
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Socket para receber dados do jogo
+	sock.bind((host,port_to_play))
+
+	while True:
+		data, addr = sock.recvfrom(4096)
+		d_list = data.split(";")
+
+	# Mudar para inserir em uma fila bloqueante
+		asteroide_pos = int(d_list[0])
+		nave1_pos     = int(d_list[1])
+		nave2_pos     = int(d_list[2])
+		p1_win        = d_list[3]
+		p2_win        = d_list[4]
+
+		if p1_win == 'T' or p2_win == 'T' :
+			break
+
+	sock.close()
+
+# thread de envio de mensagens
+#  Função deve ser invocada quando o player usa uma tecla para mover
+def send_message():
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+	data = str(nave['posicao'][0])
+	sent = sock.sendto(data.encode(),(s_ip,port))
+
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -135,7 +180,15 @@ dificuldade_font = pygame.font.SysFont(font_name, 30)
 screen           = pygame.display.set_mode((1200, 700)) 
 background       = pygame.image.load(background_filename).convert()
 
-nave = {
+nave  = {
+	'tela': pygame.image.load('nave.png').convert_alpha(),
+	'posicao': [1200/2, 700 - 60], 
+	'velocidade': {
+		'x': 0,
+	}
+}
+
+nave2 =  {
 	'tela': pygame.image.load('nave.png').convert_alpha(),
 	'posicao': [1200/2, 700 - 60], 
 	'velocidade': {
@@ -145,26 +198,25 @@ nave = {
 
 #----------------------------------------------------------------------------------------------------------------------------------------------
 
-host = socket.gethostname()
-myip = socket.gethostbyname(host)
-s    = socket.socket()
-
-sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-sock.bind((host,port_to_play))
-
-#----------------------------------------------------------------------------------------------------------------------------------------------
+# Estabelece conexão : Envia ip e porta de comunicação para o servidor
+s = socket.socket() # Socket para estabelecer conexão com servidor
 
 s.connect((s_ip, port))
 s.send(myip.encode())
 s.close()
 
+print("Connection stablished")
+
 #----------------------------------------------------------------------------------------------------------------------------------------------
 
-data, addr = sock.recvfrom(4096)
-
-print(int(data.decode()))
-
-sock.close()
+while True:
+	try:
+		x = threading.Thread(target=receive_messages)
+		x.start()
+		break
+	except:
+		print("Error")
+		pass
 
 #----------------------------------------------------------------------------------------------------------------------------------------------
 
