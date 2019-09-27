@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import time
 import queue
 import pygame
 import socket
@@ -182,10 +183,12 @@ def receive_messages():
 #	Função deve ser invocada quando o player usa uma tecla para mover ?
 #	Função deve ser chamada a cada milesimo de segundo ?
 def send_message():
-	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-	data = str(nave['posicao'][0])
-#	print("I sent : ",data)
-	sent = sock.sendto(data.encode(),(host,port))
+	while True:
+		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		data = str(nave['posicao'][0])
+	#	print("I sent : ",data)
+		sent = sock.sendto(data.encode(),(host,port))
+		time.sleep(.1)
 
 def atualiza_variaveis():
 	global nave2
@@ -249,8 +252,10 @@ connect_to_server()
 while True:
 	try:
 		r_mesg = threading.Thread(target=receive_messages)
+		s_mesg = threading.Thread(target=send_message)
 		att    = threading.Thread(target=atualiza_variaveis)
 		r_mesg.start()
+		s_mesg.start()
 		att.start()
 		break
 	except:
