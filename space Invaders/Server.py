@@ -31,13 +31,13 @@ def send_message_client():
 	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 
 	print(cli1," x ",cli2," (",port_to_play,")")
-	print("2 : ",state)
 
 	while True:
 		state['asteroide'] = random.randint(1,666)
 		data = str(state['asteroide']) + ";" + str(state['nave1']) + ";" + str(state['nave2']) + ";" + str(state['p1']) + ";" + str(state['p2'])
-		print("1 : ",data)
+		print("I've sent : ",data," To : ",(cli1,port_to_play))
 		sent = sock.sendto(data.encode(),(cli1,port_to_play))
+		time.sleep(.3)
 
 	sock.close()
 
@@ -48,17 +48,19 @@ def receive_client_messages():
 	global mesg_port
 
 	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Socket para receber dados do jogo
+	
 	sock.bind((host,mesg_port))
 
 	while True:
 		data, addr = sock.recvfrom(4096)
-		print(data.decode())
+		print("I've received : ",data.decode())
 
 
 def recieve_clients():
 	global port
 	global host
 	global clients
+	global mesg_port
 
 	sessao = False
 
@@ -71,29 +73,33 @@ def recieve_clients():
 		c1, addr = s.accept()
 		data     = c1.recv(1024)
 		clients.append(data.decode())
-
+		print("Received : ",data.decode())
 	# Estabelece conexão com segundo cliente
-		c2, addr = s.accept()
-		data     = c2.recv(1024)
-		clients.append(data.decode())
+#		c2, addr = s.accept()
+#		data     = c2.recv(1024)
+#		clients.append(data.decode())
 
-		port += 1
-		c1.send(str(port).encode))
-		c2.send(str(port).encode))
+		mesg_port += 1
+		c1.send(str(mesg_port).encode())
+		print("Sent     : ",mesg_port)
+#		c2.send(str(port).encode))
 
 		# Lidar com falhas, se vai reestabelcer conexão, etc.
-		try:
-			newpid = os.fork()
-			if newpid == 0:
+#		try:
+#			newpid = os.fork()
+#			if newpid == 0:
 			# child
-				x = threading.Thread(target=play_game)
-				x.start()
-		except:
-			print("Blue Screen")
+		play_game()
+		s_mesgs = threading.Thread(target=send_message_client)
+		r_mesgs = threading.Thread(target=receive_client_messages)
+		s_mesgs.start()
+		r_mesgs.start()
+#		except:
+#			print("Blue Screen")
 		# Fechar em outro momento casos mais parametros prescisem ser trocados
 		#   Talvez tentar sincronismo
 		c1.close()
-		c2.close()
+#		c2.close()
 
 # Main -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 

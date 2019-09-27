@@ -13,9 +13,11 @@ host = socket.gethostname()
 myip = socket.gethostbyname(host)
 
 port = 16161          # porta para conectar ao servidor/ seu valor vai provavelmente mudar durante a execução do programa
-s_ip = '192.168.0.12' # ip do servidor
+#s_ip = '192.168.0.12' # ip do servidor
 port_to_play = 12345
 
+colidiu_2           = False
+colidiu_1           = False
 vel_dificul         = 1
 explodir_nave	    = False 
 collided	    = False
@@ -120,16 +122,19 @@ def mov_ship():
 	if pygame.key.get_pressed()[K_a] : 
 #		nave['posicao'][0] += -1.5
 		nave['posicao'][0] += -1
+		send_message() # Ira enviar pacote para o servidor
 	elif pygame.key.get_pressed()[K_d] :
 #		nave['posicao'][0] +=  1.5
 		nave['posicao'][0] +=  1
+		send_message() # Ira enviar pacote para o servidor
 
-	send_message() # Ira enviar pacote para o servidor
 	block_ship()
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 # thread que recebe mensagens do servidor e coloca elas em uma fila bloqueantes
 #  Uso de protocolo UDP
+#  Seems like it'working
+#  Obs .: Há a possibilidade da primeira mensagem não estar sendo recebida
 def receive_messages():
 	global host
 	global g_list
@@ -140,7 +145,7 @@ def receive_messages():
 
 	while True:
 		data, addr = sock.recvfrom(4096)
-		d_list = data.split(";")
+		d_list = data.decode().split(";")
 
 	# Mudar para inserir em uma fila bloqueante
 		asteroide_pos = int(d_list[0])
@@ -152,14 +157,19 @@ def receive_messages():
 		if p1_win == 'T' or p2_win == 'T' :
 			break
 
+		print("I received : ",asteroide_pos)
+
 	sock.close()
 
 # thread de envio de mensagens
-#  Função deve ser invocada quando o player usa uma tecla para mover
+#   Acrescentar campo colidiu na mensagem e o modo do servidor lidar com isso
+#   Função deve ser invocada quando o player usa uma tecla para mover
+#   Função deve ser chamada a cada milesimo de segundo
 def send_message():
 	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 	data = str(nave['posicao'][0])
-	sent = sock.sendto(data.encode(),(s_ip,port))
+	print("I sent : ",data)
+	sent = sock.sendto(data.encode(),(host,port))
 
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -197,22 +207,22 @@ nave2 =  {
 }
 
 #----------------------------------------------------------------------------------------------------------------------------------------------
-
 # Estabelece conexão : Envia ip e porta de comunicação para o servidor
+
 s = socket.socket() # Socket para estabelecer conexão com servidor
 
-s.connect((s_ip, port))
+s.connect((host, port))
 s.send(myip.encode())
+data = s.recv(1024)
+port = int(data.decode())
 s.close()
-
-print("Connection stablished")
 
 #----------------------------------------------------------------------------------------------------------------------------------------------
 
 while True:
 	try:
-		x = threading.Thread(target=receive_messages)
-		x.start()
+		r_mesg = threading.Thread(target=receive_messages)
+		r_mesg.start()
 		break
 	except:
 		print("Error")
@@ -221,16 +231,15 @@ while True:
 #----------------------------------------------------------------------------------------------------------------------------------------------
 
 while True:
-	break
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
 
-	if not spawn_de_asteroides:
-		spawn_de_asteroides = 220
-		asteroides.append(create_asteroide(vel_dificul))
-	else:
-		spawn_de_asteroides -= 1
+#	if not spawn_de_asteroides:
+#		spawn_de_asteroides = 220
+#		asteroides.append(create_asteroide(vel_dificul))
+#	else:
+#		spawn_de_asteroides -= 1
 
 	render_scene()
 	raise_difficulty()
@@ -247,7 +256,6 @@ while True:
 	pygame.display.update()
 
 while True :
-	break
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
