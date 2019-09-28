@@ -55,10 +55,17 @@ def att_state():
 #  remover state do escopo local
 #  remover a parte que da pop dos cliente
 def send_message_client():
+	limit = 3
 	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
 
 	while True:
-		state['asteroide'] = random.randint(1,1200)
+		if limit == 0:
+			state['asteroide'] = random.randint(1,1200)
+			limit = 3
+		else:
+			limit -= 1
+			state['asteroide'] = -1
+
 		data1 = str(state['asteroide']) + ";" + str(state['nave1']) + ";" + str(state['nave2']) + ";" + str(state['p1']) + ";" + str(state['p2'])
 		data2 = str(state['asteroide']) + ";" + str(state['nave2']) + ";" + str(state['nave1']) + ";" + str(state['p2']) + ";" + str(state['p1'])
 
@@ -68,7 +75,7 @@ def send_message_client():
 		sent = sock.sendto(data2.encode(),(cli2,port_to_play))
 
 		# Trying to garanteen the clients will die
-		if state['p1'] == 'T':
+		if state['p1'] == 'T' or state['p2'] == 'T' :
 			print("I've sEnt : ",data1," To : ",(cli1,port_to_play))
 			sent = sock.sendto(data1.encode(),(cli1,port_to_play))
 			sent = sock.sendto(data1.encode(),(cli1,port_to_play))
@@ -76,8 +83,6 @@ def send_message_client():
 			sent = sock.sendto(data1.encode(),(cli1,port_to_play))
 			sent = sock.sendto(data1.encode(),(cli1,port_to_play))
 			sent = sock.sendto(data1.encode(),(cli1,port_to_play))
-			break
-		if state['p2'] == 'T' :
 			print("I've sEnt : ",data2," To : ",(cli2,port_to_play))
 			sent = sock.sendto(data2.encode(),(cli2,port_to_play))
 			sent = sock.sendto(data2.encode(),(cli2,port_to_play))

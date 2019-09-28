@@ -48,9 +48,10 @@ def connect_to_server():
 	port = int(data.decode())
 	s.close()
 
-# Thread que recebe mensagens do servidor e coloca elas em uma fila bloqueantes
+# Thread que recebe mensagens do servidor 
+#	coloca as mensagens em uma fila bloqueantes
 # 	Uso de protocolo UDP
-#	Obs .: Há a possibilidade da primeira mensagem não estar sendo recebida, SEMPRE
+#	para quando receber do servidor mensagem que alguem colidiu
 def receive_messages():
 	global host
 	global g_list
@@ -76,7 +77,7 @@ def receive_messages():
 
 		
 		print("I received : ",data.decode())
-		if d_list[4] == 'T':
+		if d_list[3] == 'T' or d_list[4] == 'T':
 			break
 
 	print("1 - Im dead")
@@ -84,7 +85,7 @@ def receive_messages():
 
 # Thread de envio de mensagens
 #	Função deve ser chamada a cada milesimo de segundo
-#	Adicionar condição de parada
+#	Pega a posicao da nave e a envia em conjunto com collided (que indica se a nave colidiu ou não)
 def send_message():
 	global collided
 	global collided_2
@@ -118,7 +119,10 @@ def send_message():
 		time.sleep(.1)
 
 
-# thread responsavel por atualizar variaveis
+# Thread responsavel por atualizar variaveis
+#	Le fila bloqueante
+#	Cria meteoro se necessário
+#	Atualiza posição da nave e variavel collided_2
 def atualiza_variaveis():
 	global nave2
 	global asteroides
@@ -130,9 +134,10 @@ def atualiza_variaveis():
 		try:
 			newstate = synchronized_queue.get(timeout=.5)  ## retira  a mensagem da fila
 
-			# Cria asteroide 
-			asteroidesNewPosition = newstate['asteroide']
-			asteroides.append(create_asteroide(vel_dificul,asteroidesNewPosition))
+			# Cria asteroide
+			if newstate['asteroide'] > 0:
+				asteroidesNewPosition = newstate['asteroide']
+				asteroides.append(create_asteroide(vel_dificul,asteroidesNewPosition))
 
 			# 'Move' nave 2
 			nave2['posicao'][0] = newstate['nave2']
@@ -144,6 +149,7 @@ def atualiza_variaveis():
 		except Exception as e:
 			print("Exception : ",e)
 			pass
+
 		if collided or collided_2:
 			break
 
@@ -344,7 +350,7 @@ while True :
 		
 		screen.blit(nave['tela'], nave['posicao'])
 	else:
-		if not collided :
+		if collided :
 			text = game_font.render('VOCE PERDEU!!', 1, (255, 0, 0)) 			
 			screen.blit(text, (450, 350)) #TXT DO GAME OVER APOS O JOGO
 		else :	
