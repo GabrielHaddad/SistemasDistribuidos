@@ -13,7 +13,7 @@ host = socket.gethostname()
 myip = socket.gethostbyname(host)
 port = 16161          # porta para conectar ao servidor/ seu valor vai provavelmente mudar durante a execução do programa
 port_to_play = 16661
-#s_ip = '192.168.0.12' # ip do servidor
+s_ip = '192.168.0.12' # ip do servidor
 
 ### essa parte nao recebe nem envia mensagens 
 synchronized_queue    = queue.Queue(100)
@@ -30,6 +30,128 @@ spawn_de_asteroides   = 800 #SPAWN DE ASTEROIDES DE ACORDO COM PONTUAÇÃO TOTAL
 asteroides	      = [] #LISTA DE ASTEROIDES
 background_filename   = 'galaxy2.png' 
 #asteroidesNewPosition = 0
+
+
+# SD --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# Conecta ao servidor
+#	cliente envia o seu ip (provavelment não prescisa)
+#	cliente recebe a porta que ele deve enviar as mensagens para o servidor (posição da nave)
+def connect_to_server():
+	global port
+
+	s = socket.socket() # Socket para estabelecer conexão com servidor
+
+	s.connect((s_ip, port))
+	s.send(myip.encode())
+	data = s.recv(1024)
+	port = int(data.decode())
+	s.close()
+
+# Thread que recebe mensagens do servidor e coloca elas em uma fila bloqueantes
+# 	Uso de protocolo UDP
+#	Obs .: Há a possibilidade da primeira mensagem não estar sendo recebida, SEMPRE
+def receive_messages():
+	global host
+	global g_list
+	global collided
+	global collided_2
+	global port_to_play
+
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Socket para receber dados do jogo
+	print("Bind in ",(host,port_to_play))
+	sock.bind((host,port_to_play))
+
+	while True:
+		data, addr = sock.recvfrom(4096)
+		d_list = data.decode().split(";")
+
+		synchronized_queue.put({
+			'asteroide' : int(d_list[0]),
+			'nave1'     : float(d_list[1]),
+			'nave2'     : float(d_list[2]),
+			'colidiu_p1': d_list[3],
+			'colidiu_p2': d_list[4],
+		})
+
+		
+		print("I received : ",data.decode())
+		if d_list[4] == 'T':
+			break
+
+	print("1 - Im dead")
+	sock.close()
+
+# Thread de envio de mensagens
+#	Função deve ser chamada a cada milesimo de segundo
+#	Adicionar condição de parada
+def send_message():
+	global collided
+	global collided_2
+
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+
+	while True:
+		data = str(nave['posicao'][0])
+		
+		if collided :
+			print("True - T")
+			data = data + ";T"
+		else :
+			print("False - F")
+			data = data + ";F"
+ 
+		print("I sent : ",data)
+		sent = sock.sendto(data.encode(),(s_ip,port))
+
+		if collided or collided_2:
+			print("2 - I'm dead")
+			sent = sock.sendto(data.encode(),(host,port))
+			print("I sent : ",data)
+			sent = sock.sendto(data.encode(),(host,port))
+			print("I sent : ",data)
+			sent = sock.sendto(data.encode(),(host,port))
+			print("I sent : ",data)
+			sock.close()
+			break
+
+		time.sleep(.1)
+
+
+# thread responsavel por atualizar variaveis
+def atualiza_variaveis():
+	global nave2
+	global asteroides
+	global collided
+	global collided_2
+
+	print("Time to att")
+	while True :
+		try:
+			newstate = synchronized_queue.get(timeout=.5)  ## retira  a mensagem da fila
+
+			# Cria asteroide 
+			asteroidesNewPosition = newstate['asteroide']
+			asteroides.append(create_asteroide(vel_dificul,asteroidesNewPosition))
+
+			# 'Move' nave 2
+			nave2['posicao'][0] = newstate['nave2']
+			if newstate['colidiu_p2'] == 'T': ## Servidor vai mandar mensagem para os clientes de modo que o cliente sempre sera a nave1
+				collided_2 = True
+			print("Nave 2 : ", nave2['posicao'][0]," [",collided_2,"]")
+
+			synchronized_queue.task_done()
+		except Exception as e:
+			print("Exception : ",e)
+			pass
+		if collided or collided_2:
+			break
+
+	print("3 - I'm dead")
+
+## o loop vai ser feito na funçao que chamar atualiza_variaveis
+## Ela é uma thread que atualiza parametros assim que eles estiverem na fila de mensagens
+# Game ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 def render_scene():
 	global screen
@@ -67,8 +189,8 @@ def render_scene():
 		screen.blit(dif1, (0, 22))
 
 	
-	screen.blit(nave2['tela'],nave2['posicao'])
 	screen.blit(nave['tela'], nave['posicao'])
+	screen.blit(nave2['tela'],nave2['posicao'])
 
 def raise_difficulty():
 	global vel_dificul
@@ -133,123 +255,7 @@ def mover_asteroides():
 	for asteroide in asteroides:
 		asteroide['posicao'][1] += 1
 
-# SD --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# Conecta ao servidor
-#	cliente envia o seu ip (provavelment não prescisa)
-#	cliente recebe a porta que ele deve enviar as mensagens para o servidor (posição da nave)
-def connect_to_server():
-	global port
-
-	s = socket.socket() # Socket para estabelecer conexão com servidor
-
-	s.connect((host, port))
-	s.send(myip.encode())
-	data = s.recv(1024)
-	port = int(data.decode())
-	s.close()
-
-# thread que recebe mensagens do servidor e coloca elas em uma fila bloqueantes
-# 	Uso de protocolo UDP
-#	Obs .: Há a possibilidade da primeira mensagem não estar sendo recebida, SEMPRE
-def receive_messages():
-	global host
-	global g_list
-	global collided
-	global collided_2
-	global port_to_play
-
-	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Socket para receber dados do jogo
-	print("Bind in ",(host,port_to_play))
-	sock.bind((host,port_to_play))
-
-	while True:
-		data, addr = sock.recvfrom(4096)
-		d_list = data.decode().split(";")
-
-		synchronized_queue.put({
-			'asteroide' : int(d_list[0]),
-			'nave1'     : float(d_list[1]),
-			'nave2'     : float(d_list[2]),
-			'colidiu_p1': d_list[3],
-			'colidiu_p2': d_list[4],
-		})
-		if collided or collided_2:
-			sock.close()
-			print("1 - Im dead")
-			break
-
-#		print("I received : ",int(d_list[0])," [",synchronized_queue.qsize(),"]")
-
-	sock.close()
-
-# thread de envio de mensagens
-#	Função deve ser chamada a cada milesimo de segundo
-#	Adicionar condição de parada
-def send_message():
-	global collided
-	global collided_2
-
-	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-
-	while True:
-		data = str(nave['posicao'][0])
-		
-		if collided :
-			print("True - T")
-			data = data + ";T"
-		else :
-			print("False - F")
-			data = data + ";F"
- 
-		print("I sent : ",data)
-		sent = sock.sendto(data.encode(),(host,port))
-
-		if collided or collided_2:
-			print("2 - I'm dead")
-			sent = sock.sendto(data.encode(),(host,port))
-			print("I sent : ",data)
-			sent = sock.sendto(data.encode(),(host,port))
-			print("I sent : ",data)
-			sent = sock.sendto(data.encode(),(host,port))
-			print("I sent : ",data)
-			sock.close()
-			break
-
-		time.sleep(.5)
-
-
-# thread responsavel por atualizar variaveis
-def atualiza_variaveis():
-	global nave2
-	global asteroides
-	global collided
-	global collided_2
-#	global asteroidesNewPosition
-
-	print("Time to att")
-	while True :
-		try:
-			newstate = synchronized_queue.get(timeout=.5)  ## retira  a mensagem da fila
-
-			# Cria asteroide 
-			asteroidesNewPosition = newstate['asteroide']
-			asteroides.append(create_asteroide(vel_dificul,asteroidesNewPosition))
-
-			# 'Move' nave 2
-			nave2['position'][0] = newstate['nave2']
-#			collided = newstate['colidiu_p1']        ## 1 ou dois como que vou saber se o servidor nao dizer ?
-			collided = newstate['colidiu_p2']        ## Servidor vai mandar mensagem para os clientes de modo que o cliente sempre sera a nave1
-
-			synchronized_queue.task_done()
-		except:
-			pass
-		if collided or collided_2:
-			print("3 - I'm dead")
-			break
-
-## o loop vai ser feito na funçao que chamar atualiza_variaveis
-## Ela é uma thread que atualiza parametros assim que eles estiverem na fila de mensagens
+# Main -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
       
 pygame.init() 
 pygame.font.init()
@@ -301,13 +307,6 @@ while True:
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
-
-# Quem deve chamar append e create é o atualiza variaveis
-#	if not spawn_de_asteroides:
-#		spawn_de_asteroides = 220
-#		asteroides.append(create_asteroide(vel_dificul,2))
-#	else:
-#		spawn_de_asteroides -= 1
 
 	render_scene()
 	raise_difficulty()
