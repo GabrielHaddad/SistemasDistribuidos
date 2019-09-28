@@ -151,11 +151,12 @@ def connect_to_server():
 
 # thread que recebe mensagens do servidor e coloca elas em uma fila bloqueantes
 # 	Uso de protocolo UDP
-#	Seems like it'working
-#	Obs .: Há a possibilidade da primeira mensagem não estar sendo recebida
+#	Obs .: Há a possibilidade da primeira mensagem não estar sendo recebida, SEMPRE
 def receive_messages():
 	global host
 	global g_list
+	global collided
+	global collided_2
 	global port_to_play
 
 	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # Socket para receber dados do jogo
@@ -168,37 +169,68 @@ def receive_messages():
 
 		synchronized_queue.put({
 			'asteroide' : int(d_list[0]),
-			'nave1'     : int(d_list[1]),
-			'nave2'     : int(d_list[2]),
+			'nave1'     : float(d_list[1]),
+			'nave2'     : float(d_list[2]),
 			'colidiu_p1': d_list[3],
 			'colidiu_p2': d_list[4],
 		})
+		if collided or collided_2:
+			sock.close()
+			print("1 - Im dead")
+			break
 
 #		print("I received : ",int(d_list[0])," [",synchronized_queue.qsize(),"]")
 
 	sock.close()
 
 # thread de envio de mensagens
-#	Acrescentar campo colidiu na mensagem e o modo do servidor lidar com isso
-#	Função deve ser invocada quando o player usa uma tecla para mover ?
-#	Função deve ser chamada a cada milesimo de segundo ?
+#	Função deve ser chamada a cada milesimo de segundo
+#	Adicionar condição de parada
 def send_message():
-	while True:
-		sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-		data = str(nave['posicao'][0])
-	#	print("I sent : ",data)
-		sent = sock.sendto(data.encode(),(host,port))
-		time.sleep(.1)
+	global collided
+	global collided_2
 
+	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+
+	while True:
+		data = str(nave['posicao'][0])
+		
+		if collided :
+			print("True - T")
+			data = data + ";T"
+		else :
+			print("False - F")
+			data = data + ";F"
+ 
+		print("I sent : ",data)
+		sent = sock.sendto(data.encode(),(host,port))
+
+		if collided or collided_2:
+			print("2 - I'm dead")
+			sent = sock.sendto(data.encode(),(host,port))
+			print("I sent : ",data)
+			sent = sock.sendto(data.encode(),(host,port))
+			print("I sent : ",data)
+			sent = sock.sendto(data.encode(),(host,port))
+			print("I sent : ",data)
+			sock.close()
+			break
+
+		time.sleep(.5)
+
+
+# thread responsavel por atualizar variaveis
 def atualiza_variaveis():
 	global nave2
 	global asteroides
+	global collided
+	global collided_2
 #	global asteroidesNewPosition
 
 	print("Time to att")
 	while True :
 		try:
-			newstate = synchronized_queue.get()  ## retira  a mensagem da fila
+			newstate = synchronized_queue.get(timeout=.5)  ## retira  a mensagem da fila
 
 			# Cria asteroide 
 			asteroidesNewPosition = newstate['asteroide']
@@ -212,6 +244,10 @@ def atualiza_variaveis():
 			synchronized_queue.task_done()
 		except:
 			pass
+		if collided or collided_2:
+			print("3 - I'm dead")
+			break
+
 ## o loop vai ser feito na funçao que chamar atualiza_variaveis
 ## Ela é uma thread que atualiza parametros assim que eles estiverem na fila de mensagens
       
@@ -283,6 +319,10 @@ while True:
 
 	collided = nave_collided()
 	if collided or collided_2:
+		print("Collided : ",collided)
+		r_mesg.join()
+		s_mesg.join()
+		att.join()
 		break
 			
 	pontuacaototal += 1 #PONTUAÇÃO SENDO ADICIONADA DENTRO DE UMA VARIAVEL, ANINHADA COM WHILE
