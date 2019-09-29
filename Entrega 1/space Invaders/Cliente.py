@@ -11,25 +11,22 @@ from random import randrange
 
 host = socket.gethostname()
 myip = socket.gethostbyname(host)
-port = 16161          # porta para conectar ao servidor/ seu valor vai provavelmente mudar durante a execução do programa
-port_to_play = 16661
+port = 16161          # porta para estabelecer conexão servidor/ seu valor muda durante execução (servidor manda porta as quais mensagens referentes ao jogo devem ser madadas)
+port_to_play = 16661  # porta que recebe mensagens do servidor
 s_ip = '192.168.0.12' # ip do servidor
 
 ### essa parte nao recebe nem envia mensagens 
-synchronized_queue    = queue.Queue(100)
-colidiu_2             = False
-colidiu_1             = False
+synchronized_queue    = queue.Queue(100) # fila bloqueante
 vel_dificul           = 1
 explodir_nave	      = False 
-collided	      = False 
-collided_2            = False
+collided	      = False # responsavel por parar o jogo
+collided_2            = False # responsavel por parar o jogo
 pontos		      = 0 #VARIAVEL PONTUACAO
 pontuacaototal	      = 0 #VARIAVEL DE CONTROLE DE NIVEIS
 tick_musica	      = 0 #VARIAVEL CONTROLADORA DE MUSICA
-spawn_de_asteroides   = 800 #SPAWN DE ASTEROIDES DE ACORDO COM PONTUAÇÃO TOTAL
+spawn_de_asteroides   = 5 #SPAWN DE ASTEROIDES DE ACORDO COM PONTUAÇÃO TOTAL
 asteroides	      = [] #LISTA DE ASTEROIDES
-background_filename   = 'galaxy2.png' 
-#asteroidesNewPosition = 0
+background_filename   = './Assets/galaxy2.png' 
 
 
 # SD --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -86,6 +83,8 @@ def receive_messages():
 # Thread de envio de mensagens
 #	Função deve ser chamada a cada milesimo de segundo
 #	Pega a posicao da nave e a envia em conjunto com collided (que indica se a nave colidiu ou não)
+#	Envia estado periodicamente
+#	para quando alguma das nave colide
 def send_message():
 	global collided
 	global collided_2
@@ -145,7 +144,7 @@ def atualiza_variaveis():
 				collided_2 = True
 			print("Nave 2 : ", nave2['posicao'][0]," [",collided_2,"]")
 
-			synchronized_queue.task_done()
+			synchronized_queue.task_done() # sinaliza que a mensagem retirada foi tratada
 		except Exception as e:
 			print("Exception : ",e)
 			pass
@@ -155,8 +154,6 @@ def atualiza_variaveis():
 
 	print("3 - I'm dead")
 
-## o loop vai ser feito na funçao que chamar atualiza_variaveis
-## Ela é uma thread que atualiza parametros assim que eles estiverem na fila de mensagens
 # Game ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 def render_scene():
@@ -239,20 +236,18 @@ def mov_ship():
 	global nave
 
 	if pygame.key.get_pressed()[K_a] : 
-#		nave['posicao'][0] += -1.5
 		nave['posicao'][0] += -7
 	
 	elif pygame.key.get_pressed()[K_d] :
-#		nave['posicao'][0] +=  1.5
 		nave['posicao'][0] +=  7
 
 	block_ship()
 
 def create_asteroide(vel_dificul,asteroidesNewPosition):
-#	global asteroidesNewPosition
+	global asteroidesNewPosition
 
 	return {
-		'tela'      : pygame.image.load('asteroide1.png').convert_alpha(),
+		'tela'      : pygame.image.load('./Assets/asteroide1.png').convert_alpha(),
 		'posicao'   : [asteroidesNewPosition, -64],                      # Coloca a posição passada pelo servidor
 		'velocidade': vel_dificul
 	}
@@ -263,13 +258,15 @@ def mover_asteroides():
 
 # Main -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# estabelece conexão
 connect_to_server()
       
+# prepara inicialização do jogo
 pygame.init() 
 pygame.font.init()
 
-explosion_sound  = pygame.mixer.Sound('boom.wav')
-musica_fundo	 = pygame.mixer.Sound('boom.wav')
+explosion_sound  = pygame.mixer.Sound('./Assets/boom.wav')
+musica_fundo	 = pygame.mixer.Sound('./Assets/boom.wav')
 
 pygame.display.set_caption('Space Invaders') 
 
@@ -282,7 +279,7 @@ screen           = pygame.display.set_mode((1200, 700))
 background       = pygame.image.load(background_filename).convert()
 
 nave  = {
-	'tela': pygame.image.load('nave.png').convert_alpha(),
+	'tela': pygame.image.load('./Assets/nave.png').convert_alpha(),
 	'posicao': [1200/2, 700 - 60], 
 	'velocidade': {
 		'x': 0,
@@ -290,13 +287,14 @@ nave  = {
 }
 
 nave2 =  {
-	'tela': pygame.image.load('nave.png').convert_alpha(),
+	'tela': pygame.image.load('./Assets/nave.png').convert_alpha(),
 	'posicao': [1200/2, 700 - 60], 
 	'velocidade': {
 		'x': 0,
 	}
 }
 
+# cria as threads de enviar/receber/tratar mensagens
 while True:
 	try:
 		r_mesg = threading.Thread(target=receive_messages)
@@ -309,9 +307,12 @@ while True:
 	except:
 		print("Error")
 		pass
+
+# jogo começa
 while True:
 	ini = time.process_time()	
 
+	# fechar o jogo caso clicar no 'x'
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
@@ -321,9 +322,7 @@ while True:
 	mover_asteroides()
 	mov_ship()
 
-# quem decide se colidiu é o servidor 
-#    cada cliente verifica se colidiu ou não e manda para o servidor
-
+	# se houve colisão jogo termina
 	collided = nave_collided()
 	if collided or collided_2:
 		print("Collided : ",collided)
@@ -337,10 +336,13 @@ while True:
 
 	pygame.display.update()
 
+	# Tenta fazer o jogo rodar a 60 FPS
 	end = time.process_time()
 	idle = 0.0167 - (end - ini)
-	time.sleep(idle)
+	if idle > 0:
+		time.sleep(idle)
 
+# tela de vitoria/derrota
 while True :
 	for event in pygame.event.get():
 		if event.type == QUIT:

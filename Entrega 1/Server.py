@@ -9,16 +9,17 @@ import os
 
 cli1         = "" # ip do cliente 1
 cli2         = "" # ip do cliente 2
-port         = 16161
+port         = 16161 # porta para receber conexões
 host         = socket.gethostname()
 clients      = [] 
-mesg_port    = 12346
-port_to_play = 16661
-state        = {'asteroide' : 1,'nave1': 600.0,'nave2': 600.0,'p1' : 'F','p2' : 'F'}
-mesg_queue   = queue.Queue()
+mesg_port    = 12346 # porta para receber mensgens dos clientes
+port_to_play = 16661 # porta para enviar mensgaens para os clientes
+state        = {'asteroide' : 1,'nave1': 600.0,'nave2': 600.0,'p1' : 'F','p2' : 'F'} # estado do servidor
+mesg_queue   = queue.Queue() # fila bloqueate
 
 
 # Thread : atualiza servidor de acordo com mensagens recebidas
+#	Clientes são identificados por ip
 def att_state():
 	global cli1
 	global cli2
@@ -52,8 +53,7 @@ def att_state():
 			break
 
 # Thread : envio de mensagens para os clientes. Constroi a mensagem e envia para cada um dos n clientes
-#  remover state do escopo local
-#  remover a parte que da pop dos cliente
+#	Envia mensagens periodicamente
 def send_message_client():
 	limit = 3
 	sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
@@ -66,6 +66,7 @@ def send_message_client():
 			limit -= 1
 			state['asteroide'] = -1
 
+		# Clientes sempre serão a nave1, por isso duas mensagens diferentes
 		data1 = str(state['asteroide']) + ";" + str(state['nave1']) + ";" + str(state['nave2']) + ";" + str(state['p1']) + ";" + str(state['p2'])
 		data2 = str(state['asteroide']) + ";" + str(state['nave2']) + ";" + str(state['nave1']) + ";" + str(state['p2']) + ";" + str(state['p1'])
 
@@ -98,7 +99,7 @@ def send_message_client():
 	sock.close()
 
 # Thread : recebe mensagens do cliente e as coloca em uma fila bloqueante
-#	Obs .: clientes são identificados por ip somente (depois mudar para ip e porta)
+#	Obs .: clientes são identificados por ip somente
 def receive_client_messages():
 	global host
 	global mesg_port
@@ -119,7 +120,6 @@ def receive_client_messages():
 	sock.close()
 
 # Main program (father) : recebe conexões e cria salas (processos filhos)
-#	Falta matar filhos e threads com condições de parada
 def recieve_clients():
 	global cli1
 	global cli2
@@ -146,6 +146,7 @@ def recieve_clients():
 		clients.append(addr[0])
 		print("Received : ",addr)
 
+	# Antes de criar um filho a porta de mensagens é icrementada para dois processos filhos/salas não receberem mensagens na mesma porta
 		mesg_port += 1
 		c1.send(str(mesg_port).encode())
 		c2.send(str(mesg_port).encode())
@@ -155,6 +156,7 @@ def recieve_clients():
 		c2.close()
 
 		try:
+			# Cria sala
 			newpid = os.fork()
 			if newpid == 0:
 			# child
@@ -176,8 +178,11 @@ def recieve_clients():
 				print("I'm dead")
 				break
 		except:
+			break
 			print("Blue Screen")
 
+	s.close()
 # Main -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# processo pai/principal so estabelece conexões tcp 
 recieve_clients()
