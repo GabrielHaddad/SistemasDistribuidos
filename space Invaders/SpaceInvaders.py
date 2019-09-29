@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import time
 import queue
 import pygame
 import socket
@@ -26,7 +27,7 @@ collided	    = False
 pontos		    = 0 #VARIAVEL PONTUACAO
 pontuacaototal	    = 0 #VARIAVEL DE CONTROLE DE NIVEIS
 tick_musica	    = 0 #VARIAVEL CONTROLADORA DE MUSICA
-spawn_de_asteroides = 800 #SPAWN DE ASTEROIDES DE ACORDO COM PONTUAÇÃO TOTAL
+spawn_de_asteroides = 30 #SPAWN DE ASTEROIDES DE ACORDO COM PONTUAÇÃO TOTAL
 asteroides	    = [] #LISTA DE ASTEROIDES
 background_filename = 'galaxy2.png' 
 
@@ -48,7 +49,7 @@ def nave_collided():
 
 def mover_asteroides():
 	for asteroide in asteroides:
-		asteroide['posicao'][1] += 1
+		asteroide['posicao'][1] += 8
 
 def get_rect(obj): 
 	return Rect(obj['posicao'][0],obj['posicao'][1],obj['tela'].get_width(),obj['tela'].get_height())
@@ -123,12 +124,10 @@ def mov_ship():
 
 	if pygame.key.get_pressed()[K_a] : 
 #		nave['posicao'][0] += -1.5
-		nave['posicao'][0] += -2
-		send_message() # Ira enviar pacote para o servidor
+		nave['posicao'][0] += -7
 	elif pygame.key.get_pressed()[K_d] :
 #		nave['posicao'][0] +=  1.5
-		nave['posicao'][0] +=  2
-		send_message() # Ira enviar pacote para o servidor
+		nave['posicao'][0] +=  7
 
 	block_ship()
 
@@ -210,38 +209,40 @@ nave2 =  {
 
 #----------------------------------------------------------------------------------------------------------------------------------------------
 # Estabelece conexão : Envia ip e porta de comunicação para o servidor
-
-s = socket.socket() # Socket para estabelecer conexão com servidor
-
-s.connect((host, port))
-s.send(myip.encode())
-data = s.recv(1024)
-port = int(data.decode())
-s.close()
-
+#
+#s = socket.socket() # Socket para estabelecer conexão com servidor
+#
+#s.connect((host, port))
+#s.send(myip.encode())
+#data = s.recv(1024)
+#port = int(data.decode())
+#s.close()
+#
+#----------------------------------------------------------------------------------------------------------------------------------------------
+#
+#while True:
+#	try:
+#		r_mesg = threading.Thread(target=receive_messages)
+#		r_mesg.start()
+#		break
+#	except:
+#		print("Error")
+#		pass
+#
 #----------------------------------------------------------------------------------------------------------------------------------------------
 
 while True:
-	try:
-		r_mesg = threading.Thread(target=receive_messages)
-		r_mesg.start()
-		break
-	except:
-		print("Error")
-		pass
+	ini = time.process_time()	
 
-#----------------------------------------------------------------------------------------------------------------------------------------------
-
-while True:
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
 
-#	if not spawn_de_asteroides:
-#		spawn_de_asteroides = 220
-#		asteroides.append(create_asteroide(vel_dificul))
-#	else:
-#		spawn_de_asteroides -= 1
+	if not spawn_de_asteroides:
+		spawn_de_asteroides = 30
+		asteroides.append(create_asteroide(vel_dificul))
+	else:
+		spawn_de_asteroides -= 1
 
 	render_scene()
 	raise_difficulty()
@@ -256,6 +257,13 @@ while True:
 	pontos         += 1
 
 	pygame.display.update()
+	end = time.process_time()
+
+	print("DT : ",end - ini)
+
+	idle = 0.0167 - (end - ini)
+	print(idle)
+	time.sleep(idle)
 
 while True :
 	for event in pygame.event.get():

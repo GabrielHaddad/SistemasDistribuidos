@@ -138,13 +138,13 @@ def recieve_clients():
 	# Estabelece conexão com cliente
 		c1, addr = s.accept()
 		data     = c1.recv(1024)
-		clients.append(data.decode())
-		print("Received : ",data.decode())
+		clients.append(addr[0])
+		print("Received : ",addr)
 	# Estabelece conexão com segundo cliente
 		c2, addr = s.accept()
 		data     = c2.recv(1024)
-		clients.append(data.decode())
-		print("Received : ",data.decode())
+		clients.append(addr[0])
+		print("Received : ",addr)
 
 		mesg_port += 1
 		c1.send(str(mesg_port).encode())

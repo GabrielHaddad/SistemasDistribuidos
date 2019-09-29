@@ -240,11 +240,11 @@ def mov_ship():
 
 	if pygame.key.get_pressed()[K_a] : 
 #		nave['posicao'][0] += -1.5
-		nave['posicao'][0] += -2
+		nave['posicao'][0] += -7
 	
 	elif pygame.key.get_pressed()[K_d] :
 #		nave['posicao'][0] +=  1.5
-		nave['posicao'][0] +=  2
+		nave['posicao'][0] +=  7
 
 	block_ship()
 
@@ -253,13 +253,13 @@ def create_asteroide(vel_dificul,asteroidesNewPosition):
 
 	return {
 		'tela'      : pygame.image.load('asteroide1.png').convert_alpha(),
-		'posicao'   : [randrange(1200), -64],                      # Coloca a posição passada pelo servidor
+		'posicao'   : [asteroidesNewPosition, -64],                      # Coloca a posição passada pelo servidor
 		'velocidade': vel_dificul
 	}
 
 def mover_asteroides():
 	for asteroide in asteroides:
-		asteroide['posicao'][1] += 1
+		asteroide['posicao'][1] += 8
 
 # Main -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -310,6 +310,8 @@ while True:
 		print("Error")
 		pass
 while True:
+	ini = time.process_time()	
+
 	for event in pygame.event.get():
 		if event.type == QUIT:
 			exit()
@@ -334,6 +336,10 @@ while True:
 	pontos         += 1
 
 	pygame.display.update()
+
+	end = time.process_time()
+	idle = 0.0167 - (end - ini)
+	time.sleep(idle)
 
 while True :
 	for event in pygame.event.get():
